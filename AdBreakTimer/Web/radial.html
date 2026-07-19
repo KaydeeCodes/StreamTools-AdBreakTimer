@@ -3,10 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>Ad Break Radial</title>
-<!--
-  Ad Break Timer — radial progress ring overlay
-  Made by Kaydee.Codes (https://kaydee.codes/) - Free to use, no data collected, ever.
--->
 <style>
   html, body {
     margin: 0; padding: 0;
@@ -43,23 +39,23 @@
     const track = document.getElementById('track');
     const ring = document.getElementById('ring');
 
-    // The ring is sized purely by "size" (diameter) — it just sits
-    // centred in whatever the browser source's actual dimensions are.
     const size = state.size;
     const thickness = state.thickness;
     const r = (size / 2) - (thickness / 2);
-    const circumference = 2 * Math.PI * r;
     const cx = size / 2, cy = size / 2;
+    const circumference = 2 * Math.PI * r;
 
-    svg.setAttribute('width', size);
-    svg.setAttribute('height', size);
-    svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+    svg.setAttribute('width', state.canvasWidth);
+    svg.setAttribute('height', state.canvasHeight);
+    svg.setAttribute('viewBox', `0 0 ${state.canvasWidth} ${state.canvasHeight}`);
 
     document.body.style.background = state.bgColor === 'transparent' ? 'transparent' : state.bgColor;
 
+    const ox = state.canvasWidth / 2;
+    const oy = state.canvasHeight / 2;
     for (const c of [track, ring]) {
-      c.setAttribute('cx', cx);
-      c.setAttribute('cy', cy);
+      c.setAttribute('cx', ox);
+      c.setAttribute('cy', oy);
       c.setAttribute('r', r);
       c.setAttribute('stroke-width', thickness);
     }
@@ -77,7 +73,7 @@
 
     // rotate so it starts at 12 o'clock, and mirror for anticlockwise
     const mirror = state.direction === 'ccw' ? 'scale(-1,1)' : '';
-    ring.setAttribute('transform', `translate(${cx},${cy}) rotate(-90) ${mirror} translate(${-cx},${-cy})`);
+    ring.setAttribute('transform', `translate(${ox},${oy}) rotate(-90) ${mirror} translate(${-ox},${-oy})`);
 
     const color = state.status === 'finished' ? state.finishColor : state.color;
     ring.setAttribute('stroke', color);

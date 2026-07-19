@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <title>Ad Break Bar</title>
+<!--
+  Ad Break Timer — bottom progress bar overlay
+  Made by Kaydee.Codes (https://kaydee.codes/) - Free to use, no data collected, ever.
+-->
 <style>
   html, body {
     margin: 0; padding: 0;
@@ -10,15 +14,12 @@
     background: transparent;
     overflow: hidden;
   }
-  #stage {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-  }
+  /* Pinned to the bottom of whatever size the browser source is —
+     no fixed canvas dimensions, it just fills whatever it's given. */
   #track {
-    position: absolute;
+    position: fixed;
     left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0);
+    width: 100%;
   }
   #fill {
     position: absolute;
@@ -36,29 +37,18 @@
 </style>
 </head>
 <body>
-  <div id="stage">
-    <div id="track">
-      <div id="fill"></div>
-    </div>
+  <div id="track">
+    <div id="fill"></div>
   </div>
 
 <script>
   const API = "/bar/api";
-  let lastStatus = null;
-
-  function setCanvasSize(w, h) {
-    document.getElementById('stage').style.width = w + 'px';
-    document.getElementById('stage').style.height = h + 'px';
-  }
 
   function render(state) {
     const track = document.getElementById('track');
     const fill = document.getElementById('fill');
 
     track.style.height = state.barHeight + 'px';
-    track.style.width = state.barWidth;
-    track.style.left = '0';
-    track.style.right = state.barWidth === '100%' ? '0' : 'auto';
 
     document.body.style.background = state.bgColor === 'transparent' ? 'transparent' : state.bgColor;
 
@@ -66,9 +56,18 @@
     const initial = state.initialTime > 0 ? state.initialTime : 1;
     const elapsedPct = Math.min(100, Math.max(0, ((initial - state.remaining) / initial) * 100));
 
-    // "drain": bar starts full, shrinks as time passes
-    // "fill":  bar starts empty, grows as time passes
-    const pct = state.direction === 'fill' ? elapsedPct : (100 - elapsedPct);
+    let pct;
+    if (state.status === 'finished') {
+      // Snap to full width so the finish-colour flash is actually visible,
+      // regardless of which direction the bar was draining/filling in.
+      pct = 100;
+    } else if (state.status === 'idle') {
+      pct = 0;
+    } else {
+      // "drain": bar starts full, shrinks as time passes
+      // "fill":  bar starts empty, grows as time passes
+      pct = state.direction === 'fill' ? elapsedPct : (100 - elapsedPct);
+    }
 
     fill.style.width = pct + '%';
 
@@ -86,10 +85,7 @@
     try {
       const res = await fetch(API + '?cmd=status', { cache: 'no-store' });
       const data = await res.json();
-      if (data.ok) {
-        setCanvasSize(data.state.canvasWidth, data.state.canvasHeight);
-        render(data.state);
-      }
+      if (data.ok) render(data.state);
     } catch (e) {
       // server not reachable yet — ignore and retry
     }

@@ -1,15 +1,18 @@
-﻿// ============================================================
+// ============================================================
 // Ad Break Timer — Lightweight Overlay Web Server
 //
 // Hosts two OBS browser-source overlays straight out of the exe
 // (no external files needed) and drives them with simple URL
 // commands, built for Streamer.bot.
 //
-//   http://localhost:<port>/bar/      — bottom progress bar (2560x1440)
+//   http://localhost:<port>/bar/      — bottom progress bar
 //   http://localhost:<port>/radial/   — circular progress ring
 //
 // See config/README.txt (created next to the exe on first run)
 // for the full command list.
+//
+// Made by Kaydee.Codes (https://kaydee.codes/)
+// Free to use, no data collected, ever.
 // ============================================================
 
 using System.Collections.Specialized;
@@ -90,6 +93,10 @@ Console.WriteLine($"  Config folder   : {configDir}");
 Console.WriteLine($"  Debug level     : {settings.DebugLevel}  (1=normal, 2=full diagnostics, 3=everything incl. polling)");
 Console.WriteLine($"                    change anytime: {baseUrl}/debug/set?level=1|2|3");
 Console.WriteLine("  Press Ctrl+C to stop.");
+Console.WriteLine();
+Console.ForegroundColor = ConsoleColor.DarkGray;
+Console.WriteLine("  Made by Kaydee.Codes (https://kaydee.codes/) - Free to use, no data collected, ever.");
+Console.ResetColor();
 Console.WriteLine();
 
 // ── Request loop ─────────────────────────────────────────────────────────
@@ -304,6 +311,8 @@ a{color:#7dd3fc;} code{background:#222;padding:2px 6px;border-radius:4px;}</styl
 <p>Control them with URL commands, e.g.<br>
 <code>{{baseUrl}}/bar/api?cmd=go&amp;t=01:00:00&amp;color=%2300ff00&amp;dir=drain</code></p>
 <p>Full command reference is in <code>config/README.txt</code> next to the exe.</p>
+<hr style="border-color:#333;margin-top:2rem;">
+<p style="color:#666;font-size:0.85rem;">Made by <a href="https://kaydee.codes/" style="color:#7dd3fc;">Kaydee.Codes</a> — free to use, no data collected, ever.</p>
 </body></html>
 """;
 
@@ -352,19 +361,36 @@ static bool ParseBool(string v, bool fallback) => v?.ToLowerInvariant() switch
 
 static void Tick(OverlayState s)
 {
-    if (s.Status != "running" || s.LastTick == null) return;
-    int elapsed = (int)Math.Floor((DateTime.UtcNow - s.LastTick.Value).TotalSeconds);
-    if (elapsed <= 0) return;
-    s.Remaining -= elapsed;
-    if (s.Remaining <= 0)
+    if (s.Status == "running" && s.LastTick != null)
     {
-        s.Remaining = 0;
-        s.Status = "finished";
-        s.LastTick = null;
+        int elapsed = (int)Math.Floor((DateTime.UtcNow - s.LastTick.Value).TotalSeconds);
+        if (elapsed <= 0) return;
+        s.Remaining -= elapsed;
+        if (s.Remaining <= 0)
+        {
+            s.Remaining = 0;
+            s.Status = "finished";
+            s.LastTick = null;
+            s.FinishedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            s.LastTick = DateTime.UtcNow;
+        }
+        return;
     }
-    else
+
+    // Once finished, flash for FlashDuration seconds, then quietly go
+    // idle (bar/ring disappears) so it's never stuck lit up forever if
+    // nothing sends a new command in time.
+    if (s.Status == "finished" && s.FinishedAt != null)
     {
-        s.LastTick = DateTime.UtcNow;
+        double secsSinceFinish = (DateTime.UtcNow - s.FinishedAt.Value).TotalSeconds;
+        if (secsSinceFinish >= s.FlashDuration)
+        {
+            s.Status = "idle";
+            s.FinishedAt = null;
+        }
     }
 }
 
@@ -395,11 +421,13 @@ static bool HandleCommon(string cmd, NameValueCollection qs, OverlayState s, out
                 }
                 if (!string.IsNullOrEmpty(v("dir"))) s.Direction = v("dir").ToLowerInvariant();
                 if (!string.IsNullOrEmpty(v("flash"))) s.FlashOnFinish = ParseBool(v("flash"), s.FlashOnFinish);
+                if (!string.IsNullOrEmpty(v("flashfor")) && int.TryParse(v("flashfor"), out int fd) && fd >= 0) s.FlashDuration = fd;
 
                 s.Remaining = secs;
                 s.InitialTime = secs;
                 s.Status = "running";
                 s.LastTick = DateTime.UtcNow;
+                s.FinishedAt = null;
                 return true;
             }
 
@@ -408,6 +436,7 @@ static bool HandleCommon(string cmd, NameValueCollection qs, OverlayState s, out
             if (s.InitialTime <= 0) s.InitialTime = s.Remaining;
             s.Status = "running";
             s.LastTick = DateTime.UtcNow;
+            s.FinishedAt = null;
             return true;
 
         case "pause":
@@ -415,11 +444,11 @@ static bool HandleCommon(string cmd, NameValueCollection qs, OverlayState s, out
             return true;
 
         case "stop":
-            s.Status = "idle"; s.Remaining = 0; s.LastTick = null;
+            s.Status = "idle"; s.Remaining = 0; s.LastTick = null; s.FinishedAt = null;
             return true;
 
         case "reset":
-            s.Status = "idle"; s.Remaining = s.InitialTime; s.LastTick = null;
+            s.Status = "idle"; s.Remaining = s.InitialTime; s.LastTick = null; s.FinishedAt = null;
             return true;
 
         case "settime":
@@ -429,7 +458,7 @@ static bool HandleCommon(string cmd, NameValueCollection qs, OverlayState s, out
                 int secs = HmsToSecs(t);
                 if (secs <= 0) { error = "Time must be greater than zero."; return true; }
                 s.Remaining = secs; s.InitialTime = secs;
-                s.Status = "idle"; s.LastTick = null;
+                s.Status = "idle"; s.LastTick = null; s.FinishedAt = null;
                 return true;
             }
 
@@ -472,16 +501,10 @@ static bool HandleCommon(string cmd, NameValueCollection qs, OverlayState s, out
             s.FlashOnFinish = ParseBool(v("v"), s.FlashOnFinish);
             return true;
 
-        case "setcanvassize":
-            {
-                var parts = v("v").ToLowerInvariant().Split('x');
-                if (parts.Length == 2 && int.TryParse(parts[0], out int cw) && int.TryParse(parts[1], out int ch) && cw > 0 && ch > 0)
-                {
-                    s.CanvasWidth = cw; s.CanvasHeight = ch;
-                }
-                else { error = "Use v=2560x1440 format."; }
-                return true;
-            }
+        case "setflashduration":
+            if (!int.TryParse(v("v"), out int flashDur) || flashDur < 0) { error = "Missing/invalid v= (seconds)."; return true; }
+            s.FlashDuration = flashDur;
+            return true;
 
         case "status":
         case "":
@@ -559,6 +582,11 @@ string HandleRadialCommand((string cmd, NameValueCollection qs) input, string fi
         Log("[RADIAL]", $"Could not parse {Path.GetFileName(file)} — using defaults", ConsoleColor.DarkRed, 2);
     RadialState s = loaded ?? new RadialState();
 
+    // Guards against a leftover config file from before size/thickness
+    // became percentages (they used to be raw pixel values like 300/20).
+    s.Size = Math.Clamp(s.Size, 5, 100);
+    s.Thickness = Math.Clamp(s.Thickness, 1, 50);
+
     string prevStatus = s.Status;
     Tick(s);
     if (prevStatus == "running" && s.Status == "finished")
@@ -582,10 +610,10 @@ string HandleRadialCommand((string cmd, NameValueCollection qs) input, string fi
                     break;
                 }
             case "setsize":
-                s.Size = int.TryParse(v("v"), out int sz) && sz >= 20 ? sz : s.Size;
+                s.Size = int.TryParse(v("v"), out int sz) && sz is >= 5 and <= 100 ? sz : s.Size;
                 break;
             case "setthickness":
-                s.Thickness = int.TryParse(v("v"), out int th) && th > 0 ? th : s.Thickness;
+                s.Thickness = int.TryParse(v("v"), out int th) && th is >= 1 and <= 50 ? th : s.Thickness;
                 break;
             case "settrackcolor":
                 {
@@ -625,7 +653,7 @@ void LogCommand(string tag, string cmd, OverlayState s, string? error)
     string extra = s switch
     {
         BarState b    => $"height {b.BarHeight}px, width {b.BarWidth}",
-        RadialState r => $"size {r.Size}px, thickness {r.Thickness}px",
+        RadialState r => $"size {r.Size}%, thickness {r.Thickness}%",
         _ => ""
     };
 
@@ -667,8 +695,8 @@ void LogCommand(string tag, string cmd, OverlayState s, string? error)
         case "setflash":
             Log(tag, $"Flash on finish: {(s.FlashOnFinish ? "on" : "off")}", ConsoleColor.Magenta, 1);
             break;
-        case "setcanvassize":
-            Log(tag, $"Canvas size set to {s.CanvasWidth}x{s.CanvasHeight}", ConsoleColor.Magenta, 1);
+        case "setflashduration":
+            Log(tag, $"Flash duration set to {s.FlashDuration}s", ConsoleColor.Magenta, 1);
             break;
         case "setdirection":
             Log(tag, $"Direction set to {s.Direction}", ConsoleColor.Magenta, 1);
@@ -722,11 +750,14 @@ class OverlayState
     [JsonPropertyName("flashOnFinish")]
     public bool FlashOnFinish { get; set; } = true;
 
-    [JsonPropertyName("canvasWidth")]
-    public int CanvasWidth { get; set; } = 2560;
+    // How long (seconds) the overlay flashes full-red before quietly
+    // reverting to idle if nothing else tells it what to do next.
+    [JsonPropertyName("flashDuration")]
+    public int FlashDuration { get; set; } = 30;
 
-    [JsonPropertyName("canvasHeight")]
-    public int CanvasHeight { get; set; } = 1440;
+    // Set the instant Status becomes "finished"; used to time the flash.
+    [JsonPropertyName("finishedAt")]
+    public DateTime? FinishedAt { get; set; } = null;
 
     [JsonPropertyName("direction")]
     public string Direction { get; set; } = "drain";
@@ -745,11 +776,16 @@ class BarState : OverlayState
 
 class RadialState : OverlayState
 {
+    // Percentage of the viewport's smaller dimension (vmin) used as the
+    // ring's diameter — this is what makes it scale as the OBS Browser
+    // Source is resized, instead of staying a fixed pixel size.
     [JsonPropertyName("size")]
-    public int Size { get; set; } = 300;
+    public int Size { get; set; } = 60;
 
+    // Percentage of the ring's diameter used as the stroke width, so
+    // the line thickness scales proportionally too.
     [JsonPropertyName("thickness")]
-    public int Thickness { get; set; } = 20;
+    public int Thickness { get; set; } = 7;
 
     [JsonPropertyName("trackColor")]
     public string TrackColor { get; set; } = "rgba(255,255,255,0.15)";
@@ -757,8 +793,6 @@ class RadialState : OverlayState
     public RadialState()
     {
         Direction = "cw";
-        CanvasWidth = 400;
-        CanvasHeight = 400;
     }
 }
 
@@ -769,6 +803,9 @@ static class ReadmeText
     public const string Content = """
     ============================================================
      Ad Break Timer — Setup & Command Guide
+
+     Made by Kaydee.Codes (https://kaydee.codes/)
+     Free to use, no data collected, ever.
     ============================================================
 
     WHAT THIS IS
@@ -784,9 +821,10 @@ static class ReadmeText
            http://localhost:8085/bar/
            http://localhost:8085/radial/
     2. In OBS, add a Browser Source, paste in whichever URL you want
-       (bar, radial, or both as separate sources), and set the
-       resolution to match (bar defaults to 2560x1440, radial to
-       400x400 — both are adjustable, see below).
+       (bar, radial, or both as separate sources), and set the Browser
+       Source's Width/Height to whatever you like — both overlays are
+       fully responsive and just fill whatever size you give them.
+       There's no fixed resolution to match.
     3. Tick "Shutdown source when not visible" OFF so the timer
        keeps running in the background between ad breaks.
 
@@ -834,10 +872,20 @@ static class ReadmeText
 
     THE TWO OVERLAYS
     -----------------
-    /bar/     A bar across the full width of the canvas. Fills or
-              drains left-to-right as time passes.
-    /radial/  A circular progress ring. Sweeps clockwise or
-              anticlockwise as time passes.
+    /bar/     A bar pinned to the very bottom of whatever size OBS
+              Browser Source you give it, spanning the full width.
+              Fills or drains left-to-right as time passes. Height is
+              configurable (default 5px) via cmd=setbarheight.
+    /radial/  A circular progress ring, centred in whatever size OBS
+              Browser Source you give it. Sweeps clockwise or
+              anticlockwise as time passes. Diameter is a percentage
+              of the viewport's smaller side (default 60%), so it
+              genuinely grows and shrinks as you resize the source —
+              configurable via cmd=setsize.
+
+    Both pages are fully responsive — there's no fixed canvas size to
+    match. Resize the OBS Browser Source to whatever you want and the
+    overlay just fills it.
 
     Each has its OWN config file (config/bar.json / config/radial.json)
     and its OWN API, so you can run totally different timers on each
@@ -854,11 +902,22 @@ static class ReadmeText
         /radial/api?cmd=go&t=00:03:00&color=%23ff0000&dir=cw
 
     Parameters (all optional except t):
-        t       time, hh:mm:ss or mm:ss or raw seconds  (required)
-        color   the running colour, e.g. %2300ff00 (that's #00ff00 URL-encoded)
-        finish  the colour it turns when the countdown hits zero
-        dir     bar: drain | fill        radial: cw | ccw
-        flash   on | off — pulse when finished
+        t         time, hh:mm:ss or mm:ss or raw seconds  (required)
+        color     the running colour, e.g. %2300ff00 (that's #00ff00 URL-encoded)
+        finish    the colour it turns when the countdown hits zero
+        dir       bar: drain | fill        radial: cw | ccw
+        flash     on | off — whether to flash when finished
+        flashfor  seconds to flash before auto-clearing (default 30)
+
+    WHAT HAPPENS WHEN A COUNTDOWN HITS ZERO
+    ------------------------------------------
+    The bar/ring immediately snaps to FULL (whole bar / whole ring) in
+    the "finish" colour and flashes for flashDuration seconds (30 by
+    default). After that, if nothing else has told it what to do next,
+    it automatically clears itself back to idle (invisible) — so it's
+    never left stuck lit up forever if Streamer.bot is a little late
+    sending the next command. Change the duration any time with:
+        cmd=setflashduration&v=45
 
     EXAMPLE STREAMER.BOT SETUP FOR YOUR AD-BREAK FLOW
     ----------------------------------------------------
@@ -873,9 +932,9 @@ static class ReadmeText
 
     If Streamer.bot's own countdown finishes before you send the next
     "go" (e.g. you're mid ad-break and haven't re-armed the timer
-    yet), the bar/ring will automatically sit at the "finish" colour
-    (optionally pulsing) until the next command arrives — so it's
-    never left looking broken or half-finished.
+    yet), the bar/ring will flash full and red for flashDuration
+    seconds and then clear itself automatically — so it's never left
+    looking broken or stuck half-finished.
 
     ALL COMMANDS
     ------------
@@ -883,7 +942,7 @@ static class ReadmeText
     unless marked otherwise. Replace ... with your value.
 
       General:
-        cmd=go&t=...&color=...&finish=...&dir=...&flash=on|off   (see above)
+        cmd=go&t=...&color=...&finish=...&dir=...&flash=on|off&flashfor=30   (see above)
         cmd=start
         cmd=pause
         cmd=stop                     stops and clears time
@@ -896,7 +955,7 @@ static class ReadmeText
         cmd=setfinishcolor&v=%23ff0000
         cmd=setbgcolor&v=%23000000   (or v=transparent)
         cmd=setflash&v=on|off
-        cmd=setcanvassize&v=2560x1440
+        cmd=setflashduration&v=30    seconds to flash before auto-clearing to idle
 
       Bar only:
         cmd=setdirection&v=drain|fill
@@ -905,8 +964,8 @@ static class ReadmeText
 
       Radial only:
         cmd=setdirection&v=cw|ccw
-        cmd=setsize&v=300            outer diameter in px
-        cmd=setthickness&v=20        ring stroke width in px
+        cmd=setsize&v=60             diameter as % of the viewport's smaller side (5-100, default 60)
+        cmd=setthickness&v=7         ring stroke width as % of the diameter (1-50, default 7)
         cmd=settrackcolor&v=%23333333   the "unfilled" background ring colour
 
     Colours must be URL-encoded if using #: %23 = #, e.g. #ff0000 -> %23ff0000
@@ -919,5 +978,10 @@ static class ReadmeText
       cmd=settime + cmd=start — status alone won't start it.
     - Want to hand-edit defaults: just edit config/bar.json or
       config/radial.json while the exe is NOT running, then start it.
+
+    ============================================================
+    Made by Kaydee.Codes — https://kaydee.codes/
+    Free to use, no data collected, ever.
+    ============================================================
     """;
 }

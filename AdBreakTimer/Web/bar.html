@@ -4,32 +4,48 @@
 <meta charset="UTF-8">
 <title>Ad Break Bar</title>
 <!--
-  Ad Break Timer — bottom progress bar overlay
-  Made by Kaydee.Codes (https://kaydee.codes/) - Free to use, no data collected, ever.
+  Ad Break Timer, bottom progress bar overlay.
+  Made by Kaydee.Codes (https://kaydee.codes/), free to use, no data collected, ever.
+
+  I poll /bar/api?cmd=status five times a second and just redraw
+  myself from whatever comes back. No websockets, no state kept in
+  the page itself, so OBS can load or unload this browser source at
+  any point and it always picks up wherever the timer actually is.
 -->
 <style>
   html, body {
-    margin: 0; padding: 0;
-    width: 100%; height: 100%;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
     background: transparent;
     overflow: hidden;
   }
-  /* Pinned to the bottom of whatever size the browser source is —
-     no fixed canvas dimensions, it just fills whatever it's given. */
+
+  /* Pinned to the bottom of whatever size the OBS Browser Source
+     actually is. No fixed canvas dimensions on purpose, I want this
+     to just fill whatever it's given. */
   #track {
     position: fixed;
-    left: 0; right: 0; bottom: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
   }
+
   #fill {
     position: absolute;
-    left: 0; bottom: 0; top: 0;
+    left: 0;
+    bottom: 0;
+    top: 0;
     width: 0%;
     transition: width 0.25s linear, background-color 0.3s ease;
   }
+
   #fill.pulse {
     animation: pulse 1s ease-in-out infinite;
   }
+
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.35; }
@@ -52,20 +68,21 @@
 
     document.body.style.background = state.bgColor === 'transparent' ? 'transparent' : state.bgColor;
 
-    // percent of time that has passed
+    // Percent of the countdown that's elapsed so far.
     const initial = state.initialTime > 0 ? state.initialTime : 1;
     const elapsedPct = Math.min(100, Math.max(0, ((initial - state.remaining) / initial) * 100));
 
     let pct;
     if (state.status === 'finished') {
-      // Snap to full width so the finish-colour flash is actually visible,
-      // regardless of which direction the bar was draining/filling in.
+      // Snap to full width so the finish colour flash is actually
+      // visible, no matter which direction it was draining or
+      // filling in before it hit zero.
       pct = 100;
     } else if (state.status === 'idle') {
       pct = 0;
     } else {
-      // "drain": bar starts full, shrinks as time passes
-      // "fill":  bar starts empty, grows as time passes
+      // "drain": starts full, shrinks as time passes.
+      // "fill": starts empty, grows as time passes.
       pct = state.direction === 'fill' ? elapsedPct : (100 - elapsedPct);
     }
 
@@ -87,7 +104,8 @@
       const data = await res.json();
       if (data.ok) render(data.state);
     } catch (e) {
-      // server not reachable yet — ignore and retry
+      // Server's probably not up yet, or got restarted. Just retry
+      // on the next tick instead of throwing an error into the console.
     }
     setTimeout(poll, 200);
   }

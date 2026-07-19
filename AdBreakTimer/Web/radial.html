@@ -4,25 +4,33 @@
 <meta charset="UTF-8">
 <title>Ad Break Radial</title>
 <!--
-  Ad Break Timer — radial progress ring overlay
-  Made by Kaydee.Codes (https://kaydee.codes/) - Free to use, no data collected, ever.
+  Ad Break Timer, radial progress ring overlay.
+  Made by Kaydee.Codes (https://kaydee.codes/), free to use, no data collected, ever.
+
+  Same polling model as the bar overlay: I ask /radial/api?cmd=status
+  five times a second and redraw from whatever comes back.
 -->
 <style>
   html, body {
-    margin: 0; padding: 0;
-    width: 100%; height: 100%;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
     background: transparent;
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
   }
+
   #ring {
     transition: stroke-dashoffset 0.25s linear, stroke 0.3s ease;
   }
+
   #ring.pulse {
     animation: pulse 1s ease-in-out infinite;
   }
+
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.35; }
@@ -39,10 +47,10 @@
   const API = "/radial/api";
   let lastState = null;
 
-  // Diameter = a percentage of whichever viewport dimension is smaller,
-  // recalculated on every render — this is what makes the ring actually
-  // grow and shrink as the OBS Browser Source is resized, instead of
-  // staying a fixed pixel size.
+  // Diameter is a percentage of whichever viewport dimension is
+  // smaller, recalculated on every render. This is what makes the
+  // ring actually grow and shrink as the OBS Browser Source gets
+  // resized, instead of staying a fixed pixel size like it used to.
   function computeDiameter(sizePercent) {
     const vmin = Math.min(window.innerWidth, window.innerHeight);
     return Math.max(20, vmin * (sizePercent / 100));
@@ -57,9 +65,9 @@
 
     const diameter = computeDiameter(state.size);
     const thickness = Math.max(1, diameter * (state.thickness / 100));
-    const r = (diameter / 2) - (thickness / 2);
-    const circumference = 2 * Math.PI * r;
-    const cx = diameter / 2, cy = diameter / 2;
+    const radius = (diameter / 2) - (thickness / 2);
+    const circumference = 2 * Math.PI * radius;
+    const center = diameter / 2;
 
     svg.setAttribute('width', diameter);
     svg.setAttribute('height', diameter);
@@ -67,15 +75,14 @@
 
     document.body.style.background = state.bgColor === 'transparent' ? 'transparent' : state.bgColor;
 
-    for (const c of [track, ring]) {
-      c.setAttribute('cx', cx);
-      c.setAttribute('cy', cy);
-      c.setAttribute('r', r);
-      c.setAttribute('stroke-width', thickness);
+    for (const circle of [track, ring]) {
+      circle.setAttribute('cx', center);
+      circle.setAttribute('cy', center);
+      circle.setAttribute('r', radius);
+      circle.setAttribute('stroke-width', thickness);
     }
 
     track.setAttribute('stroke', state.trackColor || 'rgba(255,255,255,0.15)');
-
     ring.setAttribute('stroke-dasharray', circumference);
 
     const initial = state.initialTime > 0 ? state.initialTime : 1;
@@ -83,19 +90,25 @@
 
     let drawnFraction;
     if (state.status === 'finished') {
-      // Fully drawn so the finish-colour flash is actually visible.
+      // Fully drawn so the finish colour flash is actually visible.
       drawnFraction = 1;
     } else if (state.status === 'idle') {
       drawnFraction = 0;
     } else {
-      // ring drains from full circle to none as time elapses
+      // Drains from a full circle down to nothing as time elapses.
       drawnFraction = 1 - elapsedPct;
     }
     ring.setAttribute('stroke-dashoffset', circumference * (1 - drawnFraction));
 
-    // rotate so it starts at 12 o'clock, and mirror for anticlockwise
+    // Rotate so the ring starts at 12 o'clock instead of 3 o'clock,
+    // and mirror it for anticlockwise. This is the standard
+    // "translate to center, rotate, translate back" trick for
+    // rotating an SVG shape around its own center. I'm not also
+    // setting transform-origin here since combining that with this
+    // manual translate math double applies the offset and throws
+    // the ring off screen, learned that one the hard way.
     const mirror = state.direction === 'ccw' ? 'scale(-1,1)' : '';
-    ring.setAttribute('transform', `translate(${cx},${cy}) rotate(-90) ${mirror} translate(${-cx},${-cy})`);
+    ring.setAttribute('transform', `translate(${center},${center}) rotate(-90) ${mirror} translate(${-center},${-center})`);
 
     const color = state.status === 'finished' ? state.finishColor : state.color;
     ring.setAttribute('stroke', color);
@@ -107,8 +120,9 @@
     }
   }
 
-  // Re-render immediately on resize (rather than waiting for the next
-  // poll) so it feels responsive while dragging the source around.
+  // Re-render immediately on resize instead of waiting for the next
+  // poll, so it feels responsive while I'm dragging the source around
+  // in OBS rather than lagging up to 200ms behind.
   window.addEventListener('resize', () => {
     if (lastState) render(lastState);
   });
@@ -119,7 +133,8 @@
       const data = await res.json();
       if (data.ok) render(data.state);
     } catch (e) {
-      // server not reachable yet — ignore and retry
+      // Server's probably not up yet, or got restarted. Just retry
+      // on the next tick instead of throwing an error into the console.
     }
     setTimeout(poll, 200);
   }

@@ -90,6 +90,18 @@ var jsonOpts = new JsonSerializerOptions
     PropertyNameCaseInsensitive = true
 };
 
+// While this is true, Log() and LogSegments() still write to the log
+// file as normal, but skip printing to the console. I need this
+// because the server starts answering requests in the background
+// before the wizard runs (see RunServerLoop further down), and
+// without this, a background event like the overlay page loading
+// can print itself right in the middle of whatever prompt the wizard
+// is currently waiting on, which looks like a broken console rather
+// than two things just happening at once. The wizard has its own
+// narration for what's going on anyway, so the console genuinely
+// doesn't need the background log noise while it's running.
+bool showBackgroundLogs = true;
+
 // ------------------------------------------------------------
 // Load settings (port + debug level + setup wizard state)
 // ------------------------------------------------------------
@@ -172,9 +184,7 @@ void RunWizardWelcomeAndPort()
         Console.WriteLine("work well and you can update them later by running this exe with");
         Console.WriteLine("--setup.");
     }
-    Console.WriteLine();
-    Console.WriteLine("STEP 1 of 4: Pick a port");
-    Console.WriteLine("--------------------------");
+    PrintStepHeader("STEP 1 of 4: Pick a port");
     Console.WriteLine("A \"port\" is just a technical address this app uses on your own");
     Console.WriteLine("computer, nothing gets sent over the internet. Unless you already");
     Console.WriteLine("know you need a specific one, just press Enter here.");
@@ -257,15 +267,18 @@ async Task RunServerLoop()
 
 if (runWizard)
 {
+    showBackgroundLogs = false;
     try
     {
         RunWizardAfterBinding(baseUrl);
     }
     catch (Exception ex)
     {
+        showBackgroundLogs = true;
         PauseOnStartupError("Something went wrong during setup.", ex);
         return;
     }
+    showBackgroundLogs = true;
 }
 
 PrintRunningBanner();
@@ -345,9 +358,7 @@ await serverTask;
 
 void RunWizardAfterBinding(string baseUrl)
 {
-    Console.WriteLine();
-    Console.WriteLine("STEP 2 of 4: Choose your overlay style");
-    Console.WriteLine("-----------------------------------------");
+    PrintStepHeader("STEP 2 of 4: Choose your overlay style");
 
     // Seed both overlays with a running hour so there's something to
     // actually look at the moment either one is added in OBS. An
@@ -394,9 +405,7 @@ void RunWizardAfterBinding(string baseUrl)
     Console.WriteLine("     even when this source isn't the one on screen.");
     Console.WriteLine("  6. Click OK.");
 
-    Console.WriteLine();
-    Console.WriteLine("STEP 3 of 4: Make sure it's working");
-    Console.WriteLine("---------------------------------------");
+    PrintStepHeader("STEP 3 of 4: Make sure it's working");
     Console.Write("Press Enter and I'll open it in your web browser so you can check it's moving (or type skip): ");
     string testInput = (Console.ReadLine() ?? "").Trim();
     if (!testInput.Equals("skip", StringComparison.OrdinalIgnoreCase))
@@ -411,9 +420,7 @@ void RunWizardAfterBinding(string baseUrl)
         Console.ReadLine();
     }
 
-    Console.WriteLine();
-    Console.WriteLine("STEP 4 of 4: Set up Streamer.bot");
-    Console.WriteLine("-----------------------------------");
+    PrintStepHeader("STEP 4 of 4: Set up Streamer.bot");
     Console.WriteLine("Last step. I need two numbers about how ads work on your Twitch");
     Console.WriteLine("channel, then I'll write out the exact commands to paste into");
     Console.WriteLine("Streamer.bot myself, nothing to figure out by hand.");
@@ -429,6 +436,7 @@ void RunWizardAfterBinding(string baseUrl)
 
     int adBreakSeconds = AskDurationSeconds(
         "How long does one ad break usually last? (press Enter for 3:00): ", 180);
+    Console.WriteLine();
     int adFreeSeconds = AskDurationSeconds(
         "How long between ad breaks, your normal streaming time? (press Enter for 1:00:00): ", 3600);
 
@@ -463,6 +471,23 @@ void RunWizardAfterBinding(string baseUrl)
     Console.WriteLine();
     Console.Write("Press Enter to finish and start the overlay properly...");
     Console.ReadLine();
+}
+
+// A proper full-width, coloured divider for each wizard step instead
+// of just a plain title with a line of dashes under it. The wizard
+// is a wall of text otherwise, and a single blank line between steps
+// is easy to miss when scrolling back through a console window, this
+// makes each step impossible to mistake for a continuation of the
+// last one.
+static void PrintStepHeader(string title)
+{
+    Console.WriteLine();
+    Console.ForegroundColor = ConsoleColor.Cyan;
+    Console.WriteLine("========================================================");
+    Console.WriteLine(title);
+    Console.WriteLine("========================================================");
+    Console.ResetColor();
+    Console.WriteLine();
 }
 
 // Prints a friendly message instead of a raw stack trace, and waits
@@ -704,6 +729,7 @@ async Task HandleRequest(HttpListenerContext ctx)
 void Log(string tag, string message, ConsoleColor color, int level = 1)
 {
     WriteToLogFile(tag, message, level);
+    if (!showBackgroundLogs) return;
     if (settings.DebugLevel < level) return;
     Console.ForegroundColor = ConsoleColor.DarkGray;
     Console.Write($"[{DateTime.Now:HH:mm:ss}] ");
@@ -720,6 +746,7 @@ void Log(string tag, string message, ConsoleColor color, int level = 1)
 void LogSegments(string tag, ConsoleColor baseColor, int level, params (string text, ConsoleColor? color)[] segments)
 {
     WriteToLogFile(tag, string.Concat(segments.Select(s => s.text)), level);
+    if (!showBackgroundLogs) return;
     if (settings.DebugLevel < level) return;
     Console.ForegroundColor = ConsoleColor.DarkGray;
     Console.Write($"[{DateTime.Now:HH:mm:ss}] ");

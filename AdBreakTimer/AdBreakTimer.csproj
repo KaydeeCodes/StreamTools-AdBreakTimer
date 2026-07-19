@@ -1,4 +1,14 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Ad Break Timer
+    Made by Kaydee.Codes (https://kaydee.codes/)
+    Free to use, no data collected, ever.
+
+    This publishes as one self contained exe for Windows. No install,
+    no separate runtime needed on the machine that runs it. See
+    BUILD_INSTRUCTIONS.md for the actual publish command.
+  -->
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -6,9 +16,21 @@
     <RootNamespace>AdBreakTimer</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <!-- Skips loading ICU/globalization data. I don't do any culture
+         specific formatting anywhere in here, so this just makes the
+         published exe smaller and starts a little faster. -->
     <InvariantGlobalization>true</InvariantGlobalization>
 
-    <!-- Single-file, self-contained publish settings -->
+    <Authors>Kaydee.Codes</Authors>
+    <Company>Kaydee.Codes</Company>
+    <Product>Ad Break Timer</Product>
+    <Description>Made by Kaydee.Codes (https://kaydee.codes/). Free to use, no data collected, ever.</Description>
+    <Version>1.1.0</Version>
+
+    <!-- Single file, self contained publish settings. This is what
+         turns "dotnet publish" into one AdBreakTimer.exe with the
+         .NET runtime baked in, instead of a folder full of dlls. -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -18,7 +40,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- HTML/CSS/JS overlay pages get baked into the exe -->
+    <!-- Both overlay pages get compiled straight into the exe as
+         embedded resources, see SendEmbedded() in Program.cs. That
+         means there's nothing on disk for a friend to accidentally
+         move or delete, the whole app really is just the one exe. -->
     <EmbeddedResource Include="Web\*.html" />
   </ItemGroup>
 

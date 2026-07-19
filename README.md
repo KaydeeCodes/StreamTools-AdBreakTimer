@@ -87,7 +87,7 @@ That starts a 30 second green countdown that flashes red on finish.
 
 ## Building from source
 
-This needs the .NET 8 SDK to build, but the resulting exe is fully self contained and needs nothing installed to run.
+This needs the .NET 9 SDK to build, but the resulting exe is fully self contained and needs nothing installed to run.
 
 ```bash
 # from inside the AdBreakTimer folder, the one with AdBreakTimer.csproj

@@ -339,7 +339,7 @@ Sub-actions, in order:
 3. **Delay**: `185000` ms, a little longer than the ad break itself, as a buffer
 4. **Action**: calls Action 2 below to re-arm the long countdown
 
-![Streamer.bot AdsInProgress action](docs/screenshots/streamerbot-adsinprogress-action.png)
+![Streamer.bot AdsInProgress action](AdBreakTimer/docs/screenshots/streamerbot-adsinprogress-action.png)
 
 ### Action 2: AdsFinished, chained from Action 1
 
@@ -349,11 +349,11 @@ Sub-actions:
 
 1. **Fetch URL**: `http://localhost:37000/bar/api?cmd=go&t=01:00:00&color=%2300ff00&finish=%23ff0000&dir=drain`, starts the green countdown to the next ad break
 
-![Streamer.bot AdsFinished action](docs/screenshots/streamerbot-adsfinished-action.png)
+![Streamer.bot AdsFinished action](AdBreakTimer/docs/screenshots/streamerbot-adsfinished-action.png)
 
 Both actions sit together in Streamer.bot's action list once set up:
 
-![Streamer.bot action list](docs/screenshots/streamerbot-action-list.png)
+![Streamer.bot action list](AdBreakTimer/docs/screenshots/streamerbot-action-list.png)
 
 ### Adding the Fetch URL sub-action
 

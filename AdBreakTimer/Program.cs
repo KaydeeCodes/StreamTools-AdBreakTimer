@@ -1,15 +1,18 @@
-﻿// ============================================================
+// ============================================================
 // Ad Break Timer — Lightweight Overlay Web Server
 //
 // Hosts two OBS browser-source overlays straight out of the exe
 // (no external files needed) and drives them with simple URL
 // commands, built for Streamer.bot.
 //
-//   http://localhost:<port>/bar/      — bottom progress bar (2560x1440)
+//   http://localhost:<port>/bar/      — bottom progress bar
 //   http://localhost:<port>/radial/   — circular progress ring
 //
 // See config/README.txt (created next to the exe on first run)
 // for the full command list.
+//
+// Made by Kaydee.Codes (https://kaydee.codes/)
+// Free to use, no data collected, ever.
 // ============================================================
 
 using System.Collections.Specialized;
@@ -90,6 +93,10 @@ Console.WriteLine($"  Config folder   : {configDir}");
 Console.WriteLine($"  Debug level     : {settings.DebugLevel}  (1=normal, 2=full diagnostics, 3=everything incl. polling)");
 Console.WriteLine($"                    change anytime: {baseUrl}/debug/set?level=1|2|3");
 Console.WriteLine("  Press Ctrl+C to stop.");
+Console.WriteLine();
+Console.ForegroundColor = ConsoleColor.DarkGray;
+Console.WriteLine("  Made by Kaydee.Codes (https://kaydee.codes/) - Free to use, no data collected, ever.");
+Console.ResetColor();
 Console.WriteLine();
 
 // ── Request loop ─────────────────────────────────────────────────────────
@@ -304,6 +311,8 @@ a{color:#7dd3fc;} code{background:#222;padding:2px 6px;border-radius:4px;}</styl
 <p>Control them with URL commands, e.g.<br>
 <code>{{baseUrl}}/bar/api?cmd=go&amp;t=01:00:00&amp;color=%2300ff00&amp;dir=drain</code></p>
 <p>Full command reference is in <code>config/README.txt</code> next to the exe.</p>
+<hr style="border-color:#333;margin-top:2rem;">
+<p style="color:#666;font-size:0.85rem;">Made by <a href="https://kaydee.codes/" style="color:#7dd3fc;">Kaydee.Codes</a> — free to use, no data collected, ever.</p>
 </body></html>
 """;
 
@@ -471,17 +480,6 @@ static bool HandleCommon(string cmd, NameValueCollection qs, OverlayState s, out
         case "setflash":
             s.FlashOnFinish = ParseBool(v("v"), s.FlashOnFinish);
             return true;
-
-        case "setcanvassize":
-            {
-                var parts = v("v").ToLowerInvariant().Split('x');
-                if (parts.Length == 2 && int.TryParse(parts[0], out int cw) && int.TryParse(parts[1], out int ch) && cw > 0 && ch > 0)
-                {
-                    s.CanvasWidth = cw; s.CanvasHeight = ch;
-                }
-                else { error = "Use v=2560x1440 format."; }
-                return true;
-            }
 
         case "status":
         case "":
@@ -667,9 +665,6 @@ void LogCommand(string tag, string cmd, OverlayState s, string? error)
         case "setflash":
             Log(tag, $"Flash on finish: {(s.FlashOnFinish ? "on" : "off")}", ConsoleColor.Magenta, 1);
             break;
-        case "setcanvassize":
-            Log(tag, $"Canvas size set to {s.CanvasWidth}x{s.CanvasHeight}", ConsoleColor.Magenta, 1);
-            break;
         case "setdirection":
             Log(tag, $"Direction set to {s.Direction}", ConsoleColor.Magenta, 1);
             break;
@@ -722,12 +717,6 @@ class OverlayState
     [JsonPropertyName("flashOnFinish")]
     public bool FlashOnFinish { get; set; } = true;
 
-    [JsonPropertyName("canvasWidth")]
-    public int CanvasWidth { get; set; } = 2560;
-
-    [JsonPropertyName("canvasHeight")]
-    public int CanvasHeight { get; set; } = 1440;
-
     [JsonPropertyName("direction")]
     public string Direction { get; set; } = "drain";
 }
@@ -757,8 +746,6 @@ class RadialState : OverlayState
     public RadialState()
     {
         Direction = "cw";
-        CanvasWidth = 400;
-        CanvasHeight = 400;
     }
 }
 
@@ -769,6 +756,9 @@ static class ReadmeText
     public const string Content = """
     ============================================================
      Ad Break Timer — Setup & Command Guide
+
+     Made by Kaydee.Codes (https://kaydee.codes/)
+     Free to use, no data collected, ever.
     ============================================================
 
     WHAT THIS IS
@@ -784,9 +774,10 @@ static class ReadmeText
            http://localhost:8085/bar/
            http://localhost:8085/radial/
     2. In OBS, add a Browser Source, paste in whichever URL you want
-       (bar, radial, or both as separate sources), and set the
-       resolution to match (bar defaults to 2560x1440, radial to
-       400x400 — both are adjustable, see below).
+       (bar, radial, or both as separate sources), and set the Browser
+       Source's Width/Height to whatever you like — both overlays are
+       fully responsive and just fill whatever size you give them.
+       There's no fixed resolution to match.
     3. Tick "Shutdown source when not visible" OFF so the timer
        keeps running in the background between ad breaks.
 
@@ -834,10 +825,18 @@ static class ReadmeText
 
     THE TWO OVERLAYS
     -----------------
-    /bar/     A bar across the full width of the canvas. Fills or
-              drains left-to-right as time passes.
-    /radial/  A circular progress ring. Sweeps clockwise or
-              anticlockwise as time passes.
+    /bar/     A bar pinned to the very bottom of whatever size OBS
+              Browser Source you give it, spanning the full width.
+              Fills or drains left-to-right as time passes. Height is
+              configurable (default 5px) via cmd=setbarheight.
+    /radial/  A circular progress ring, centred in whatever size OBS
+              Browser Source you give it. Sweeps clockwise or
+              anticlockwise as time passes. Diameter is configurable
+              (default 300px) via cmd=setsize.
+
+    Both pages are fully responsive — there's no fixed canvas size to
+    match. Resize the OBS Browser Source to whatever you want and the
+    overlay just fills it.
 
     Each has its OWN config file (config/bar.json / config/radial.json)
     and its OWN API, so you can run totally different timers on each
@@ -896,7 +895,6 @@ static class ReadmeText
         cmd=setfinishcolor&v=%23ff0000
         cmd=setbgcolor&v=%23000000   (or v=transparent)
         cmd=setflash&v=on|off
-        cmd=setcanvassize&v=2560x1440
 
       Bar only:
         cmd=setdirection&v=drain|fill
@@ -919,5 +917,10 @@ static class ReadmeText
       cmd=settime + cmd=start — status alone won't start it.
     - Want to hand-edit defaults: just edit config/bar.json or
       config/radial.json while the exe is NOT running, then start it.
+
+    ============================================================
+    Made by Kaydee.Codes — https://kaydee.codes/
+    Free to use, no data collected, ever.
+    ============================================================
     """;
 }

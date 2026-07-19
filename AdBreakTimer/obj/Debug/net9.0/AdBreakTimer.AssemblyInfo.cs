@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AdBreakTimer")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f81d3440bc040c35e8ab8cc7f6402002c86d376f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
 [assembly: System.Reflection.AssemblyProductAttribute("AdBreakTimer")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AdBreakTimer")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

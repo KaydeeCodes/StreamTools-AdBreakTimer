@@ -4,6 +4,7 @@
 ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)
 ![Type](https://img.shields.io/badge/type-single%20exe-blue)
 ![License](https://img.shields.io/badge/license-free%20to%20use-brightgreen)
+[![Latest release](https://img.shields.io/github/v/release/KaydeeCodes/StreamTools-AdBreakTimer)](https://github.com/KaydeeCodes/StreamTools-AdBreakTimer/releases/latest)
 
 A lightweight local web server that hosts two OBS Browser Source overlays (a bar and a radial ring) and drives them with simple URL commands. Built for Streamer.bot, but works with anything that can send an HTTP request.
 
@@ -13,8 +14,25 @@ Made by [Kaydee.Codes](https://kaydee.codes/). Free to use, no data collected, e
 
 ---
 
+## Download
+
+Grab the latest build from the [Releases page](https://github.com/KaydeeCodes/StreamTools-AdBreakTimer/releases/latest). Unzip it and run `AdBreakTimer.exe`, that's the entire install.
+
+Each release includes a SHA256 checksum in its notes. If you want to verify your download wasn't tampered with:
+
+```
+certutil -hashfile AdBreakTimer.exe SHA256
+```
+
+Compare the output against the hash listed on the release page.
+
+Prefer to build it yourself instead? See [Building from source](#building-from-source).
+
+---
+
 ## Contents
 
+- [Download](#download)
 - [Features](#features)
 - [Quick start](#quick-start)
 - [Building from source](#building-from-source)
@@ -76,7 +94,7 @@ This needs the .NET 8 SDK to build, but the resulting exe is fully self containe
 dotnet publish -c Release
 ```
 
-The exe lands in `bin/Release/net8.0/win-x64/publish/AdBreakTimer.exe`. That single file is the entire distributable, nothing else needs to travel with it.
+The exe lands in `bin/Release/<target framework>/win-x64/publish/AdBreakTimer.exe`. The `<target framework>` folder name depends on which .NET SDK is installed on the machine doing the build (for example `net8.0` or `net9.0`), so just look for whatever folder is actually there under `bin/Release/`. That single exe is the entire distributable, nothing else needs to travel with it.
 
 Full walkthrough, including installing the SDK, is in [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md).
 

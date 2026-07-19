@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ad Break Bar</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    background: transparent;
+    overflow: hidden;
+  }
+  #stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+  #track {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0);
+  }
+  #fill {
+    position: absolute;
+    left: 0; bottom: 0; top: 0;
+    width: 0%;
+    transition: width 0.25s linear, background-color 0.3s ease;
+  }
+  #fill.pulse {
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="track">
+      <div id="fill"></div>
+    </div>
+  </div>
+
+<script>
+  const API = "/bar/api";
+  let lastStatus = null;
+
+  function setCanvasSize(w, h) {
+    document.getElementById('stage').style.width = w + 'px';
+    document.getElementById('stage').style.height = h + 'px';
+  }
+
+  function render(state) {
+    const track = document.getElementById('track');
+    const fill = document.getElementById('fill');
+
+    track.style.height = state.barHeight + 'px';
+    track.style.width = state.barWidth;
+    track.style.left = '0';
+    track.style.right = state.barWidth === '100%' ? '0' : 'auto';
+
+    document.body.style.background = state.bgColor === 'transparent' ? 'transparent' : state.bgColor;
+
+    // percent of time that has passed
+    const initial = state.initialTime > 0 ? state.initialTime : 1;
+    const elapsedPct = Math.min(100, Math.max(0, ((initial - state.remaining) / initial) * 100));
+
+    // "drain": bar starts full, shrinks as time passes
+    // "fill":  bar starts empty, grows as time passes
+    const pct = state.direction === 'fill' ? elapsedPct : (100 - elapsedPct);
+
+    fill.style.width = pct + '%';
+
+    const color = state.status === 'finished' ? state.finishColor : state.color;
+    fill.style.backgroundColor = color;
+
+    if (state.status === 'finished' && state.flashOnFinish) {
+      fill.classList.add('pulse');
+    } else {
+      fill.classList.remove('pulse');
+    }
+  }
+
+  async function poll() {
+    try {
+      const res = await fetch(API + '?cmd=status', { cache: 'no-store' });
+      const data = await res.json();
+      if (data.ok) {
+        setCanvasSize(data.state.canvasWidth, data.state.canvasHeight);
+        render(data.state);
+      }
+    } catch (e) {
+      // server not reachable yet — ignore and retry
+    }
+    setTimeout(poll, 200);
+  }
+
+  poll();
+</script>
+</body>
+</html>
